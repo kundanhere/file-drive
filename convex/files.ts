@@ -78,3 +78,34 @@ export const getFiles = query({
       .collect();
   },
 });
+
+// handle file delete request
+export const deleteFile = mutation({
+  args: { fileId: v.id("files") },
+  async handler(ctx, args) {
+    // 1. Check user identity
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError("You do not have access to this organization");
+    }
+
+    // 2. Check if the file exists in database
+    const file = await ctx.db.get(args.fileId);
+    if (!file) {
+      throw new ConvexError("This file does not exist");
+    }
+
+    // 3. Check if has access to remove file from database.
+    const hasAccess = await hasAccessToOrg(
+      ctx,
+      identity.tokenIdentifier,
+      file.orgId,
+    );
+    if (!hasAccess) {
+      throw new ConvexError("You do not have access to delete this file");
+    }
+
+    // remove data from database
+    await ctx.db.delete(args.fileId);
+  },
+});
